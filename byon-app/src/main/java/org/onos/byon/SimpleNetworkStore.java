@@ -87,6 +87,8 @@ public class SimpleNetworkStore implements NetworkStore{
     public Set<Intent> removeIntents(String network) {
         Collection<Intent> intents = checkNotNull(intentsPerNet.get(network));
         //get返回值为Variable，用Collection
+        System.out.print("test");
         return ImmutableSet.copyOf(intents);
+
     }
 }
