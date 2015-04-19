@@ -15,33 +15,22 @@
  */
 package org.onos.byon;
 
-import com.google.common.collect.Sets;
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.Service;
+import org.apache.felix.scr.annotations.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.event.AbstractListenerRegistry;
 import org.onosproject.event.EventDeliveryService;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
-import org.onosproject.net.intent.IntentEvent;
-import org.onosproject.net.intent.IntentListener;
 import org.onosproject.net.intent.IntentService;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 /**
  * Skeletal ONOS application component.
  */
@@ -51,8 +40,23 @@ public class NetworkManager implements NetworkService{
 
     private static Logger log = LoggerFactory.getLogger(NetworkManager.class);
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected CoreService coreService;
+
+    private ApplicationId appId;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected NetworkStore store;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected IntentService intentService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected EventDeliveryService eventDispatcher;
     @Activate
     protected void activate() {
+        appId = coreService.registerApplication("org.onos.byon");
+
 
         log.info("Started");
     }
@@ -66,31 +70,60 @@ public class NetworkManager implements NetworkService{
 
     @Override
     public void createNetwork(String network) {
-
+        checkNotNull(network, "Network name cannot be null");
+        store.putNetwork(network);
     }
 
     @Override
     public void deleteNetwork(String network) {
-
+        checkNotNull(network,"Network name cannot be null");
+        removeFromMesh(store.removeIntents(network));
+        store.removeNetwork(network);
     }
 
     @Override
     public Set<String> getNetworks() {
-        return Sets.newHashSet("test");
+        return store.getNetworks();
     }
 
     @Override
     public void addHost(String network, HostId hostId) {
-
+        checkNotNull(network, "Network cannot be null");
+        checkNotNull(hostId, "HostId cannot be null");
+        Set<HostId> hostIds = store.addHost(network, hostId);
+        store.addIntents(network, addToMesh(hostId, hostIds));
     }
 
     @Override
     public void removeHost(String network, HostId hostId) {
-
+        checkNotNull(network, "Network name cannot be null");
+        checkNotNull(hostId, "HostId cannot be null");
+        store.removeHost(network, hostId);
+        removeFromMesh(store.removeIntents(network,hostId));
     }
 
     @Override
     public Set<HostId> getHosts(String network) {
-        return Collections.emptySet();
+        checkNotNull(network, "Network name cannot be null");
+        return store.getHosts(network);
+    }
+
+    private Set<Intent> addToMesh(HostId src, Set<HostId> existing){
+        if (existing.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Intent> submitted = new HashSet<>();
+        existing.forEach(dst -> {
+            if (!src.equals(dst)) {
+                Intent intent = new HostToHostIntent(appId, src, dst);
+                submitted.add(intent);
+                intentService.submit(intent);
+            }
+        });
+        return submitted;
+    }
+
+    private void removeFromMesh (Set<Intent> intents){
+        intents.forEach(intent -> intentService.withdraw(intent));
     }
 }
