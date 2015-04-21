@@ -8,6 +8,7 @@ import org.apache.felix.scr.annotations.Service;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.AbstractStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 @Component(immediate = true, enabled = true)
 @Service
-public class SimpleNetworkStore implements NetworkStore{
+public class SimpleNetworkStore
+        extends AbstractStore<NetworkEvent, NetworkStoreDelegate>
+        implements NetworkStore{
     private static Logger log = LoggerFactory.getLogger(SimpleNetworkStore.class);
     private final Map<String, Set<HostId>> networks = Maps.newHashMap();
     private final Map<String, Set<Intent>> intentsPerNet = Maps.newHashMap();
@@ -33,12 +36,16 @@ public class SimpleNetworkStore implements NetworkStore{
     public void putNetwork(String network) {
         intentsPerNet.putIfAbsent(network, Sets.<Intent>newHashSet());
         //google 的Sets 类很有意思
-        networks.putIfAbsent(network, Sets.<HostId>newHashSet());
+        if (networks.putIfAbsent(network, Sets.<HostId>newHashSet()) == null){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_ADDED,network));
+        }
     }
 
     @Override
     public void removeNetwork(String network) {
-        intentsPerNet.remove(network);
+        if(intentsPerNet.remove(network) != null){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_REMOVED,network));
+        }
         networks.remove(network);
     }
 
@@ -52,14 +59,18 @@ public class SimpleNetworkStore implements NetworkStore{
     public Set<HostId> addHost(String network, HostId hostId) {
         Set<HostId> hosts = checkNotNull(networks.get(network),"Please create the network first");
         boolean added = hosts.add(hostId);
-
+        if (added){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_UPDATED, network));
+        }
         return added ? ImmutableSet.copyOf(hosts) : Collections.emptySet();
     }
 
     @Override
     public void removeHost(String network, HostId hostId) {
         Set<HostId> hosts = checkNotNull(networks.get(network),"Please create the network first");
-        hosts.remove(hostId);
+        if (hosts.remove(hostId)){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_UPDATED, network));
+        }
     }
 
     @Override

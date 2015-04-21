@@ -18,6 +18,7 @@ package org.onos.byon;
 import org.apache.felix.scr.annotations.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.event.AbstractListenerRegistry;
 import org.onosproject.event.EventDeliveryService;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
@@ -31,33 +32,33 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Skeletal ONOS application component.
  */
 @Component(immediate = true)
 @Service
-public class NetworkManager implements NetworkService{
+public class NetworkManager implements NetworkService {
 
     private static Logger log = LoggerFactory.getLogger(NetworkManager.class);
-
+    private final AbstractListenerRegistry<NetworkEvent, NetworkListener>
+            listenerRegistry = new AbstractListenerRegistry<>();
+    private final NetworkStoreDelegate delegate = new InternalStoreDelegate();
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
-
-    private ApplicationId appId;
-
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkStore store;
-
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected IntentService intentService;
-
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected EventDeliveryService eventDispatcher;
+    private ApplicationId appId;
+
     @Activate
     protected void activate() {
         appId = coreService.registerApplication("org.onos.byon");
-
-
+        eventDispatcher.addSink(NetworkEvent.class, listenerRegistry);
+        store.setDelegate(delegate);
         log.info("Started");
     }
 
@@ -76,7 +77,7 @@ public class NetworkManager implements NetworkService{
 
     @Override
     public void deleteNetwork(String network) {
-        checkNotNull(network,"Network name cannot be null");
+        checkNotNull(network, "Network name cannot be null");
         removeFromMesh(store.removeIntents(network));
         store.removeNetwork(network);
     }
@@ -99,7 +100,7 @@ public class NetworkManager implements NetworkService{
         checkNotNull(network, "Network name cannot be null");
         checkNotNull(hostId, "HostId cannot be null");
         store.removeHost(network, hostId);
-        removeFromMesh(store.removeIntents(network,hostId));
+        removeFromMesh(store.removeIntents(network, hostId));
     }
 
     @Override
@@ -108,7 +109,17 @@ public class NetworkManager implements NetworkService{
         return store.getHosts(network);
     }
 
-    private Set<Intent> addToMesh(HostId src, Set<HostId> existing){
+    @Override
+    public void addListener(NetworkListener listener) {
+        listenerRegistry.addListener(listener);
+    }
+
+    @Override
+    public void removeListener(NetworkListener listener) {
+        listenerRegistry.removeListener(listener);
+    }
+
+    private Set<Intent> addToMesh(HostId src, Set<HostId> existing) {
         if (existing.isEmpty()) {
             return Collections.emptySet();
         }
@@ -123,7 +134,14 @@ public class NetworkManager implements NetworkService{
         return submitted;
     }
 
-    private void removeFromMesh (Set<Intent> intents){
+    private void removeFromMesh(Set<Intent> intents) {
         intents.forEach(intent -> intentService.withdraw(intent));
+    }
+
+    private class InternalStoreDelegate implements NetworkStoreDelegate {
+        @Override
+        public void notify(NetworkEvent event) {
+            eventDispatcher.post(event);
+        }
     }
 }

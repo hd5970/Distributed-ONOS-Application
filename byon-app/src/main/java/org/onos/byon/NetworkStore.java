@@ -5,10 +5,11 @@ package org.onos.byon;
  */
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.Store;
 
 import java.util.Set;
 
-public interface NetworkStore {
+public interface NetworkStore extends Store<NetworkEvent, NetworkStoreDelegate>{
     /**
      * Create a named network.
      *
