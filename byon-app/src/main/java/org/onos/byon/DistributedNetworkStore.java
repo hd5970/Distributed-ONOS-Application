@@ -1,20 +1,24 @@
 package org.onos.byon;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.hazelcast.core.EntryAdapter;
+import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.EntryListener;
+import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Service;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
-import org.onosproject.store.AbstractStore;
+import org.onosproject.store.hz.AbstractHazelcastStore;
+import org.onosproject.store.hz.SMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,14 +28,33 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Created by hd5970 on 4/19/15.
  */
-@Component(immediate = false, enabled = false)
+@Component(immediate = true, enabled = true)
 @Service
-public class SimpleNetworkStore
-        extends AbstractStore<NetworkEvent, NetworkStoreDelegate>
+public class DistributedNetworkStore
+        extends AbstractHazelcastStore<NetworkEvent, NetworkStoreDelegate>
         implements NetworkStore{
     private static Logger log = LoggerFactory.getLogger(SimpleNetworkStore.class);
-    private final Map<String, Set<HostId>> networks = Maps.newHashMap();
-    private final Map<String, Set<Intent>> intentsPerNet = Maps.newHashMap();
+    private SMap<String, Set<HostId>> networks;
+    private SMap<String, Set<Intent>> intentsPerNet;
+
+    private String listenerId;
+
+    @Activate
+    public void activate() {
+        super.activate();
+
+        networks = new SMap<>(theInstance.<byte[], byte[]>getMap("byon-networks"), this.serializer);
+        intentsPerNet = new SMap<>(theInstance.<byte[], byte[]>getMap("byon-network-intents"), this.serializer);
+        EntryListener<String, Set<HostId>> listener = new RemoteListener();
+        listenerId = networks.addEntryListener(listener, true);
+        log.info("Started");
+    }
+
+    @Deactivate
+    public void deactivate() {
+        networks.removeEntryListener(listenerId);
+        log.info("Stopped");
+    }
     @Override
     public void putNetwork(String network) {
         intentsPerNet.putIfAbsent(network, Sets.<Intent>newHashSet());
@@ -89,7 +112,7 @@ public class SimpleNetworkStore
     @Override
     public Set<Intent> removeIntents(String network, HostId hostId) {
         Set<Intent> intents = checkNotNull(intentsPerNet.get(network).stream().map(intent -> (HostToHostIntent)intent)
-        .filter(intent -> intent.one().equals(hostId) || intent.two().equals(hostId)).collect(Collectors.toSet()));
+                .filter(intent -> intent.one().equals(hostId) || intent.two().equals(hostId)).collect(Collectors.toSet()));
         intentsPerNet.get(network).remove(intents);
         return intents;
     }
@@ -100,6 +123,20 @@ public class SimpleNetworkStore
         //get返回值为Variable，用Collection
 
         return ImmutableSet.copyOf(intents);
+    }
 
+    private class RemoteListener extends EntryAdapter<String, Set<HostId>>{
+        @Override
+        public void entryAdded(EntryEvent<String, Set<HostId>> event){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_ADDED, event.getKey()));
+        }
+
+        public void entryUpdated(EntryEvent<String, Set<HostId>> event){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_UPDATED, event.getKey()));
+        }
+
+        public void entryRemoved(EntryEvent<String, Set<HostId>> event){
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_REMOVED, event.getKey()));
+        }
     }
 }

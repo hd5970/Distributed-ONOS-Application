@@ -41,17 +41,25 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class NetworkManager implements NetworkService {
 
     private static Logger log = LoggerFactory.getLogger(NetworkManager.class);
+
     private final AbstractListenerRegistry<NetworkEvent, NetworkListener>
             listenerRegistry = new AbstractListenerRegistry<>();
+
     private final NetworkStoreDelegate delegate = new InternalStoreDelegate();
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkStore store;
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected IntentService intentService;
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+
     protected EventDeliveryService eventDispatcher;
+
     private ApplicationId appId;
 
     @Activate
@@ -64,7 +72,8 @@ public class NetworkManager implements NetworkService {
 
     @Deactivate
     protected void deactivate() {
-
+        eventDispatcher.removeSink(NetworkEvent.class);
+        store.unsetDelegate(delegate);
         log.info("Stopped");
     }
 
