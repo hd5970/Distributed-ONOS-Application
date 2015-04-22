@@ -21,6 +21,10 @@ import org.onosproject.core.CoreService;
 import org.onosproject.event.AbstractListenerRegistry;
 import org.onosproject.event.EventDeliveryService;
 import org.onosproject.net.HostId;
+import org.onosproject.net.flow.DefaultTrafficSelector;
+import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.TrafficSelector;
+import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
 import org.onosproject.net.intent.IntentService;
@@ -135,7 +139,10 @@ public class NetworkManager implements NetworkService {
         Set<Intent> submitted = new HashSet<>();
         existing.forEach(dst -> {
             if (!src.equals(dst)) {
-                Intent intent = new HostToHostIntent(appId, src, dst);
+                TrafficSelector selector = DefaultTrafficSelector.emptySelector();
+                TrafficTreatment treatment = DefaultTrafficTreatment.emptyTreatment();
+
+                Intent intent = new HostToHostIntent(appId, src, dst, selector, treatment);
                 submitted.add(intent);
                 intentService.submit(intent);
             }
