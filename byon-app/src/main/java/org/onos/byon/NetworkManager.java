@@ -151,7 +151,7 @@ public class NetworkManager implements NetworkService {
     }
 
     private void removeFromMesh(Set<Intent> intents) {
-        intents.forEach(intent -> intentService.withdraw(intent));
+        intents.forEach(intentService::withdraw);
     }
 
     private class InternalStoreDelegate implements NetworkStoreDelegate {
