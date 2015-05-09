@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 @Component(immediate = true)
 public class NetworkEventListener {
 
-    private static Logger log = LoggerFactory.getLogger(NetworkEventMonitor.class);
+    private static Logger log = LoggerFactory.getLogger(NetworkEventListener.class);
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkService service;
