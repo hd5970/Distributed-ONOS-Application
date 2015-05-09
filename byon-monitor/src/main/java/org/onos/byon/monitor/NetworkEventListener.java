@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * Skeletal ONOS application component.
  */
 @Component(immediate = true)
-public class NetworkEventMonitor {
+public class NetworkEventListener {
 
     private static Logger log = LoggerFactory.getLogger(NetworkEventMonitor.class);
 
@@ -52,6 +52,6 @@ public class NetworkEventMonitor {
         public void event(NetworkEvent event) {
             log.info("{}", event);
         }
-        
+
     }
 }
