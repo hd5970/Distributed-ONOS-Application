@@ -52,5 +52,6 @@ public class NetworkEventMonitor {
         public void event(NetworkEvent event) {
             log.info("{}", event);
         }
+        
     }
 }
