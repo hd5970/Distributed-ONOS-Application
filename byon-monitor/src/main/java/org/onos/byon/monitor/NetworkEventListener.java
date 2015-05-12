@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onos.byon;
+package org.onos.byon.;
 
 import org.apache.felix.scr.annotations.*;
 import org.onos.byon.NetworkEvent;
